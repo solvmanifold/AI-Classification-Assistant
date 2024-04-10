@@ -34,5 +34,6 @@ if uploaded_files:
         elem = process_pdf(uploaded_files)
         if 'few_shot_examples' not in st.session_state.keys():
             st.session_state['few_shot_examples'] = elem
+        st.success("Tables processed successfully!")
         
 
