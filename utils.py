@@ -26,6 +26,24 @@ def prompt_template(classify_examples, user_query):
     Follow the above `classify_examples` examples which was classified by you previously and use as reference to classify the `user_query` documents. Go through different examples for classification labels and respond with only \n
     classification label and rationale justification for your classification\n Assistant:""")
 
+def llm_models():
+    model_list=["openAI:GPT-4","llama2-70B-chat","openAI:GPT-4-turbo","mistral-7B-Instruct",
+                "Anthropic:claude-v2","Anthropic:claude-2.1","Anthropic:claude-v1","gcp:gemini-pro",
+                "Anthropic:claude-instant-1.2","mistral-large","databricks:dbrx-intruct"]
+    
+    model_params={"openAI:GPT-4":"https://clarifai.com/openai/chat-completion/models/GPT-4",
+                  "llama2-70B-chat":"https://clarifai.com/meta/Llama-2/models/llama2-70b-chat",
+                  "openAI:GPT-4-turbo":"https://clarifai.com/openai/chat-completion/models/gpt-4-turbo",
+                  "mistral-7B-Instruct":"https://clarifai.com/mistralai/completion/models/mistral-7B-Instruct",
+                  "Anthropic:claude-v2":"https://clarifai.com/anthropic/completion/models/claude-v2",
+                  "Anthropic:claude-2.1":"https://clarifai.com/anthropic/completion/models/claude-2_1",
+                  "Anthropic:claude-v1":"https://clarifai.com/anthropic/completion/models/claude-v1",
+                  "gcp:gemini-pro":"https://clarifai.com/gcp/generate/models/gemini-pro",
+                  "Anthropic:claude-instant-1.2":"https://clarifai.com/anthropic/completion/models/claude-instant-1_2",
+                  "mistral-large":"https://clarifai.com/mistralai/completion/models/mistral-large",
+                  "databricks:dbrx-intruct":"https://clarifai.com/databricks/drbx/models/dbrx-instruct",
+                  }
+    return model_list, model_params
 
     
                         
