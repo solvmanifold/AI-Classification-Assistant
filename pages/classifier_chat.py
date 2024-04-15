@@ -51,11 +51,6 @@ def retrieve_and_parse_few_shot(user_query, vectorDB):
   examples = few_shot_examples(vectorDB, user_query)
   return few_shot_promt_template(examples,user_query)
 
-def zero_shot_examples():
-  with open("../module-classifier/ODNI_examples.html") as f:
-    examples = f.read()
-    return examples
-
 def selectbox():
     with st.sidebar:
         counter1 = option_menu("previous queries", 
@@ -100,7 +95,7 @@ with st.sidebar:
   if mode == "Few shot":
     no_of_examples = st.number_input("Enter the number of examples",min_value=1,max_value=25)
         
-  zst = zero_shot_examples()
+  zst = zero_shot_contents()
   if PAT and mode:
     if "config" not in st.session_state.keys():
       st.session_state["config"] = True
