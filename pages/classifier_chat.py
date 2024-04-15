@@ -35,6 +35,8 @@ if 'start_chat' not in st.session_state.keys():
 if "chat_history" not in st.session_state.keys():
   st.session_state['chat_history'] = [{"Query": "Let's classify", "content": "How may I help you?"}]
       
+PAT = st.experimental_get_query_params()["pat"][0]
+
 def init_db(no_of_examples):
   query_params = st.experimental_get_query_params()
   USER_ID = query_params["user_id"][0] if "user_id" in query_params.keys() else None
@@ -81,7 +83,8 @@ def textbox(llm, mode, zero_shot_examples, no_of_examples : int = 1):
       st.session_state['chat_history'].append(message)
       if len(st.session_state['chat_history']) >= 2:
         selectbox()
-        
+ 
+lm = model_Select()       
 if not st.session_state['start_chat']:
     chatbtn = st.button("Start Chatting", key="chat_btn")
     if chatbtn:
@@ -89,19 +92,17 @@ if not st.session_state['start_chat']:
        st.experimental_rerun()
        
 with st.sidebar:
-  PAT = st.text_input("**Enter your Clarifai PAT**", type="password", key="PAT")
   mode = st.radio("**Select the classification mode**",["ICL zero shot","Few shot"] )
   
   if mode == "Few shot":
     no_of_examples = st.number_input("Enter the number of examples",min_value=1,max_value=25)
-        
-  zst = zero_shot_contents()
-  if PAT and mode:
+  
+  if mode:
+    zst = zero_shot_contents()
     if "config" not in st.session_state.keys():
       st.session_state["config"] = True
 
 try:
-  lm = model_Select()
   if st.session_state['start_chat'] and st.session_state["config"]:
     if mode == "Few shot":
       textbox(lm, mode, zst, no_of_examples)
