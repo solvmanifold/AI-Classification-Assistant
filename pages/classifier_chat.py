@@ -10,19 +10,12 @@ from langchain.vectorstores import Clarifai as clarifaivectorstore
 st.set_page_config(layout="wide")
 ClarifaiStreamlitCSS.insert_default_css(st)
 
-st.markdown("""
-<style>
-    .stTabs [data-baseweb="tab"] p {
-        font-size: 24px;
-        font-weight: bold;
-    }
-    .st-cd {
-        gap: 3rem;
-    }
-</style>""", unsafe_allow_html=True)
-
 st.markdown(
-  "<h1 style='text-align: center; color: black;'> Classify your data 🔍</h1>",
+  "<h1 style='text-align: center; color: black;'> AI Classification Assistant</h1>",
+  unsafe_allow_html=True,
+)
+st.markdown(
+  "<h1 style='text-align: center; color: black;'>🤖 🔍 📚</h1>",
   unsafe_allow_html=True,
 )
 st.markdown(
