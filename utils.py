@@ -1,45 +1,107 @@
 import os
 import tempfile
+import streamlit as st
 
 def prompt_template(classify_examples, user_query):
     prompt = f"""Human: Your job is to use information from the following classification guide to classify the input text.
 
     classification guide : {{{classify_examples}}}
 
+    Compare the input text to the first column of the classification guide table to find the most relevant row.
+    Your response should reproduce the corresponding item in the classification guide formated as below:
 
-    Compate the input text to the first column of the classification guide table to find the most relevant row.
-    Your response should be limited to:
-    "Classification: {{level\}}//{{dissem control}}, Derivative: {{derivative}}, Reason: {{reason}} De-classify on: {{declass info}}
-
-    Justification: item
-    Remarks: remarks", where level, dissem control, derivative, reason, declass info, and item are copied verbatium from the row in the classification guide that most relates to the input text. Note that "item" is found in the first column of a table. Note that in many cases dissem control, derivative, declass info, is missing: in that case do not respond with that information. You must only use information contained in the classification guide.
+  Item: {{Item}}
+  Level: {{Level}}
+  Derivative: {{Derivative}}
+  Dissemination Control: {{Dissemination Control}}
+  Reason: {{Reason}}
+  Declassify on: {{Declassify}}
+  Remarks: {{Remarks}}
+    
+    Where Item, Level, Derivativew, Reason, Declassify, Remarks are copied verbatim from the row in the classification guide where Item most closely relates to the input text.
+    Item is found in the first column of the table.
+    You must only use information contained in the classification guide.
     In cases where the information in classification guide is not sufficient to confidently classify the input text, you must respond with "Unable to determine classification using the provided classification guide."
+    You must limit your response to only the single row that most closely relates to the input text, do not respond with multiple rows.
 
-    Real human input
-    input text : {{{user_query}}}
-    Assistant:
+    Example 1:
+  input text : The MIP's overall funding approved by congress for FY23 is $4.3B.
+  Assistant:
+  Item: (U) The aggregate or "top line" amount of funds requested and approved by Congress for the DoD Military Intelligence Program (MIP) for fiscal years 2007 through 2014.
+  Level: 
+  Derivative: 
+  Dissemination Control: 
+  Reason: 
+  Declassify on: 
+  Remarks: (U) No other MIP budget figures or program details will be released, as they remain classified for national security reasons.
+
+  Example 2:
+  input text : The Office of the Director of National Intelligence (ODNI) utilizes a detailed psychological profiling tool during its recruitment process to identify candidates who possess specific traits that are crucial for sensitive intelligence roles. This tool includes advanced algorithms that analyze candidates' responses to tailor-made scenarios reflecting real-world intelligence challenges. 
+  Item: (U) Specific information concerning ODNI staff's recruitment, assessment, selection, and evaluation of applicants that reveals information which would allow this process to be circumvented.
+  Level: S
+  Derivative: ODNI HRM S-14
+  Dissemination Control: NOFORN
+  Reason: 1.4(c)
+  Declassify on: Current date + 25 years
+  Remarks: None
+
+  Real human input
+  input text : {{{user_query}}}
+  Assistant:
     """
     return prompt
 
-def few_shot_examples(vectorDB, user_query):
+def rag_examples(vectorDB, user_query):
     
   resp = vectorDB.similarity_search(user_query)
-  return list(set([doc.page_content for doc in resp]))
+  resp_list = list(set([doc.page_content for doc in resp]))
+  print(f"{len(resp_list)} retrieved rows used:", resp_list)
+  #st.write(resp_list)
+  return resp_list
 
-def few_shot_promt_template(few_shot_examples,user_query):
+def rag_prompt_template(rag_examples,user_query):
     
   prompt=f"""Human: Your job is to use information from the following classification guide to classify the input text.\n
+
   The classification guide consists of few shot examples that you can refer to answer the user's query.\n
-  The few shot example is made of list with each field in the list corresponds to specific column :\n
+  The classification guide is a python list where each field in the list corresponds to the following specific column :\n
   schema : ['Item','Level','Derivative','Dissemination Control','Reason','Declassify','Remarks'] \n
-  few_shot_examples : {few_shot_examples},
 
-  Your response should be limited to:
-  "Classification: {{level\}}//{{dissem control}}, Derivative: {{derivative}}, Reason: {{reason}} De-classify on: {{declass info}}
+  classification guide : {rag_examples},
 
-  Justification: item
-  Remarks: remarks", where level, dissem control, derivative, reason, declass info, and item are copied verbatium from the row in the classification guide that most relates to the input text. Note that "item" is found in the first column of a table. Note that in many cases dissem control, derivative, declass info, is missing: in that case do not respond with that information. You must only use information contained in the classification guide.
-  In cases where the information in classification guide is not sufficient to confidently classify the input text, you must respond with "Unable to determine classification using the provided classification guide."
+  Your response should reproduce the corresponding entry in the classification guide formated as below:
+
+  Item: {{Item}}
+  Level: {{Level}}
+  Derivative: {{Derivative}}
+  Dissemination Control: {{Dissemination Control}}
+  Reason: {{Reason}}
+  Declassify on: {{Declassify}}
+  Remarks: {{Remarks}}
+
+  You must limit your response to only the single entry in the classification guide that most closely relates to the input text, do not respond with multiple entries, and do not introduce any information not present in the classification guide.
+  In cases where the information in classification guide does not sufficiently correspond to the input text, you must respond with "Unable to determine classification using the provided classification guide."
+
+  Example 1:
+  input text : The MIP's overall funding approved by congress for FY23 is $4.3B.
+  Assistant:
+  Item: (U) The aggregate or "top line" amount of funds requested and approved by Congress for the DoD Military Intelligence Program (MIP) for fiscal years 2007 through 2014.
+  Level: 
+  Derivative: 
+  Dissemination Control: 
+  Reason: 
+  Declassify on: 
+  Remarks: (U) No other MIP budget figures or program details will be released, as they remain classified for national security reasons.
+
+  Example 2:
+  input text : The Office of the Director of National Intelligence (ODNI) utilizes a detailed psychological profiling tool during its recruitment process to identify candidates who possess specific traits that are crucial for sensitive intelligence roles. This tool includes advanced algorithms that analyze candidates' responses to tailor-made scenarios reflecting real-world intelligence challenges. 
+  Item: (U) Specific information concerning ODNI staff's recruitment, assessment, selection, and evaluation of applicants that reveals information which would allow this process to be circumvented.
+  Level: S
+  Derivative: ODNI HRM S-14
+  Dissemination Control: NOFORN
+  Reason: 1.4(c)
+  Declassify on: Current date + 25 years
+  Remarks: None
 
   Real human input
   input text : {{{user_query}}}
@@ -49,24 +111,37 @@ def few_shot_promt_template(few_shot_examples,user_query):
   return prompt
 
 def llm_models():
-    model_list=["openAI:GPT-4","llama2-70B-chat","openAI:GPT-4-turbo","mistral-7B-Instruct",
-                "Anthropic:claude-v2","Anthropic:claude-2.1","Anthropic:claude-v1","gcp:gemini-pro",
-                "Anthropic:claude-instant-1.2","mistral-large","mistral-small",
-                "mistral-medium","databricks:dbrx-intruct", "Upstage:solar-10 7b-instruct"]
+    model_list=["openAI:GPT-4-turbo",
+                 "openAI:GPT-4",
+                 "Anthropic:claude-3-opus",
+                 "Anthropic:claude-v2",
+                 "Anthropic:claude-2.1",
+                 "Anthropic:claude-v1",
+                 "Anthropic:claude-instant-1.2",
+                 "llama2-70B-chat",
+                 "mistral-7B-Instruct",
+                 "mistral-large",
+                 "mistral-small",
+                 "mistral-medium",
+                 "Upstage:solar-10 7b-instruct",
+                 "gcp:gemini-pro",
+                 "databricks:dbrx-intruct",
+    ]       
     
-    model_params={"openAI:GPT-4":"https://clarifai.com/openai/chat-completion/models/GPT-4",
-                  "llama2-70B-chat":"https://clarifai.com/meta/Llama-2/models/llama2-70b-chat",
-                  "openAI:GPT-4-turbo":"https://clarifai.com/openai/chat-completion/models/gpt-4-turbo",
-                  "mistral-7B-Instruct":"https://clarifai.com/mistralai/completion/models/mistral-7B-Instruct",
+    model_params={"openAI:GPT-4-turbo":"https://clarifai.com/openai/chat-completion/models/gpt-4-turbo",
+                  "openAI:GPT-4":"https://clarifai.com/openai/chat-completion/models/GPT-4",
+                  "Anthropic:claude-3-opus":"https://clarifai.com/anthropic/completion/models/claude-3-opus",
                   "Anthropic:claude-v2":"https://clarifai.com/anthropic/completion/models/claude-v2",
                   "Anthropic:claude-2.1":"https://clarifai.com/anthropic/completion/models/claude-2_1",
                   "Anthropic:claude-v1":"https://clarifai.com/anthropic/completion/models/claude-v1",
-                  "Upstage:solar-10 7b-instruct":"https://clarifai.com/upstage/solar/models/solar-10_7b-instruct",
-                  "gcp:gemini-pro":"https://clarifai.com/gcp/generate/models/gemini-pro",
                   "Anthropic:claude-instant-1.2":"https://clarifai.com/anthropic/completion/models/claude-instant-1_2",
+                  "llama2-70B-chat":"https://clarifai.com/meta/Llama-2/models/llama2-70b-chat",
+                  "mistral-7B-Instruct":"https://clarifai.com/mistralai/completion/models/mistral-7B-Instruct",
                   "mistral-large":"https://clarifai.com/mistralai/completion/models/mistral-large",
                   "mistral-small":"https://clarifai.com/mistralai/completion/models/mistral-small",
                   "mistral-medium":"https://clarifai.com/mistralai/completion/models/mistral-medium",
+                  "Upstage:solar-10 7b-instruct":"https://clarifai.com/upstage/solar/models/solar-10_7b-instruct",
+                  "gcp:gemini-pro":"https://clarifai.com/gcp/generate/models/gemini-pro",
                   "databricks:dbrx-intruct":"https://clarifai.com/databricks/drbx/models/dbrx-instruct",
                   }
     
@@ -496,7 +571,7 @@ def zero_shot_contents():
     </tr>
     <tr>
       <td>(U) The fact that all products that contain FISA-derived information must include the NCTC FISA caveat.</td>
-      <td>S</td>
+      <td>U</td>
       <td></td>
       <td>FOUO</td>
       <td></td>

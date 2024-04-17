@@ -49,9 +49,9 @@ def init_db(no_of_examples):
   )
   return vectorDB
 
-def retrieve_and_parse_few_shot(user_query, vectorDB):
-  examples = few_shot_examples(vectorDB, user_query)
-  return few_shot_promt_template(examples,user_query)
+def retrieve_and_parse_rag(user_query, vectorDB):
+  examples = rag_examples(vectorDB, user_query)
+  return rag_prompt_template(examples,user_query), examples
 
 def selectbox():
     with st.sidebar:
@@ -64,21 +64,40 @@ def model_Select():
   selected_model = st.selectbox("Select the LLM model", llm_model)
   if selected_model:
     llm = ClarifaiLLM(model_url=llm_params[selected_model], pat=PAT)
+
   return llm
  
+def process_response(text):
+    # Find & remove any text after line containing "Remarks"
+    remarks_index = text.find("Remarks")
+    if remarks_index != -1:
+        newline_index = text.find('\n', remarks_index)
+        if newline_index != -1:
+            text = text[:newline_index]
+    # Format newlines for html rendering
+    text = text.replace('\n','<br>')
+    return text
+
 def textbox(llm, mode, zero_shot_examples, no_of_examples : int = 1):
    user_query = st.text_area("Enter your text here", key="text_area")
    classify_button = st.button("Classify", key="classify_btn") 
    if classify_button: 
     with st.spinner("Thinking..."):
-      if mode == "Few shot":
+      rag_examples = None
+      if mode == "RAG":
         vectorDB = init_db(no_of_examples)
-        prompt = retrieve_and_parse_few_shot(user_query, vectorDB)
+        prompt, rag_examples = retrieve_and_parse_rag(user_query, vectorDB)
       else:
         prompt = prompt_template(zero_shot_examples, user_query)
         
-      response = llm(prompt)
-      st.write(response)
+      response = llm.invoke(prompt)
+      print(response.replace('\n','\\n'))
+      st.markdown(process_response(response), unsafe_allow_html=True)
+
+      if rag_examples:
+         st.write("Closest matching items:")
+         st.write(rag_examples)
+
       message = [{"Query": user_query, "Response": response}]
       st.session_state['chat_history'].append(message)
       if len(st.session_state['chat_history']) >= 2:
@@ -92,9 +111,9 @@ if not st.session_state['start_chat']:
        st.experimental_rerun()
        
 with st.sidebar:
-  mode = st.radio("**Select the classification mode**",["ICL zero shot","Few shot"] )
+  mode = st.radio("**Select the classification mode**",["ICL zero shot","RAG"] )
   
-  if mode == "Few shot":
+  if mode == "RAG":
     no_of_examples = st.number_input("Enter the number of examples",min_value=1,max_value=25)
   
   if mode:
@@ -104,7 +123,7 @@ with st.sidebar:
 
 try:
   if st.session_state['start_chat'] and st.session_state["config"]:
-    if mode == "Few shot":
+    if mode == "RAG":
       textbox(lm, mode, zst, no_of_examples)
     else:
       textbox(lm, mode, zst)
