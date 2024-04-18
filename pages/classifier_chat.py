@@ -1,11 +1,14 @@
-import os
 import streamlit as st
 from streamlit_option_menu import option_menu
-from utils import *
-import pandas as pd
-from clarifai.modules.css import ClarifaiStreamlitCSS
+from prettytable import PrettyTable
+
 from langchain_community.llms import Clarifai as ClarifaiLLM
-from langchain.vectorstores import Clarifai as clarifaivectorstore
+
+from clarifai.client.search import Search
+from clarifai.modules.css import ClarifaiStreamlitCSS
+
+from utils import *
+
 
 st.set_page_config(layout="wide")
 ClarifaiStreamlitCSS.insert_default_css(st)
@@ -30,20 +33,20 @@ if "chat_history" not in st.session_state.keys():
       
 PAT = st.experimental_get_query_params()["pat"][0]
 
-def init_db(no_of_examples):
+def init_search_db(no_of_examples):
   query_params = st.experimental_get_query_params()
   USER_ID = query_params["user_id"][0] if "user_id" in query_params.keys() else None
   APP_ID = query_params["app_id"][0] if "app_id" in query_params.keys() else None
-  vectorDB = clarifaivectorstore(
+  search_vectorDB = Search(
     user_id=USER_ID,
     app_id=APP_ID,
-    number_of_docs=no_of_examples*3,
+    top_k=no_of_examples,
     pat = PAT
   )
-  return vectorDB
-
-def retrieve_and_parse_rag(user_query, vectorDB):
-  examples = rag_examples(vectorDB, user_query)
+  return search_vectorDB
+  
+def retrieve_and_parse_rag(user_query, vectorDB, pat):
+  examples = retrieve_examples_rag(vectorDB, user_query, pat)
   return rag_prompt_template(examples,user_query), examples
 
 def selectbox():
@@ -78,8 +81,8 @@ def textbox(llm, mode, zero_shot_examples, no_of_examples : int = 1):
     with st.spinner("Thinking..."):
       rag_examples = None
       if mode == "RAG":
-        vectorDB = init_db(no_of_examples)
-        prompt, rag_examples = retrieve_and_parse_rag(user_query, vectorDB)
+        vectorDB = init_search_db(no_of_examples)
+        prompt, rag_examples = retrieve_and_parse_rag(user_query, vectorDB, PAT)
       else:
         prompt = prompt_template(zero_shot_examples, user_query)
         
@@ -88,8 +91,15 @@ def textbox(llm, mode, zero_shot_examples, no_of_examples : int = 1):
       st.markdown(process_response(response), unsafe_allow_html=True)
 
       if rag_examples:
-         st.write("Closest matching items:")
-         st.write(rag_examples)
+        table = PrettyTable()
+        table.field_names = ["Retrieved Context", "Similarity Score"]
+        
+        for context, score in rag_examples:
+          table.add_row([context, score])
+          
+        st.markdown("#") 
+        st.write("**Closest matching items:**")
+        st.write(table)
 
       message = [{"Query": user_query, "Response": response}]
       st.session_state['chat_history'].append(message)

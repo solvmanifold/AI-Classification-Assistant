@@ -1,6 +1,6 @@
 import os
-import tempfile
-import streamlit as st
+import requests
+from concurrent.futures import ThreadPoolExecutor
 
 def prompt_template(classify_examples, user_query):
     prompt = f"""Human: Your job is to use information from the following classification guide to classify the input text.
@@ -51,13 +51,24 @@ def prompt_template(classify_examples, user_query):
     """
     return prompt
 
-def rag_examples(vectorDB, user_query):
-    
-  resp = vectorDB.similarity_search(user_query)
-  resp_list = list(set([doc.page_content for doc in resp]))
-  print(f"{len(resp_list)} retrieved rows used:", resp_list)
-  #st.write(resp_list)
-  return resp_list
+def retrieve_examples_rag(vectorDB, user_query, pat):
+  response = list(vectorDB.query(ranks=[{"text_raw": user_query}],
+                                 filters=[{'input_types': ['text']}]))
+  hits =[hit for data in response for hit in data.hits]
+  executor = ThreadPoolExecutor(max_workers=10)
+
+  def hit_to_document(hit, pat):
+    h= {"authorization": f"Bearer {pat}"}
+    request = requests.get(hit.input.data.text.url, headers=h)
+    request.encoding = request.apparent_encoding
+    requested_text = request.text
+    return (requested_text, "{:.3f}".format(hit.score))
+
+  # Iterate over hits and retrieve hit.score and text
+  futures = [executor.submit(hit_to_document, hit, pat) for hit in hits]
+  docs_and_scores = list(set([future.result() for future in futures]))
+
+  return docs_and_scores
 
 def rag_prompt_template(rag_examples,user_query):
     
