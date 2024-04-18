@@ -114,7 +114,7 @@ if not st.session_state['start_chat']:
        st.experimental_rerun()
        
 with st.sidebar:
-  mode = st.radio("**Select the classification mode**",["ICL zero shot","RAG"] )
+  mode = st.radio("**Select the classification mode**",["ICL","RAG"] )
   
   if mode == "RAG":
     no_of_examples = st.number_input("Enter the number of examples",min_value=1,max_value=25)
