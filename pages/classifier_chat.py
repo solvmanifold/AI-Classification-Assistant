@@ -1,26 +1,24 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
-from utils import *
-import pandas as pd
-from clarifai.modules.css import ClarifaiStreamlitCSS
+from prettytable import PrettyTable
+
 from langchain_community.llms import Clarifai as ClarifaiLLM
+
+from clarifai.client.search import Search
+from clarifai.modules.css import ClarifaiStreamlitCSS
+
+from utils import *
+
 
 st.set_page_config(layout="wide")
 ClarifaiStreamlitCSS.insert_default_css(st)
 
-st.markdown("""
-<style>
-    .stTabs [data-baseweb="tab"] p {
-        font-size: 24px;
-        font-weight: bold;
-    }
-    .st-cd {
-        gap: 3rem;
-    }
-</style>""", unsafe_allow_html=True)
-
 st.markdown(
-  "<h1 style='text-align: center; color: black;'> Classify your data 🔍</h1>",
+  "<h1 style='text-align: center; color: black;'> AI Classification Assistant</h1>",
+  unsafe_allow_html=True,
+)
+st.markdown(
+  "<h1 style='text-align: center; color: black;'>🤖 🔍 📚</h1>",
   unsafe_allow_html=True,
 )
 st.markdown(
@@ -32,58 +30,110 @@ if 'start_chat' not in st.session_state.keys():
     
 if "chat_history" not in st.session_state.keys():
   st.session_state['chat_history'] = [{"Query": "Let's classify", "content": "How may I help you?"}]
+      
+PAT = st.experimental_get_query_params()["pat"][0]
 
-with st.sidebar:
-  PAT = st.text_input("Enter your Clarifai PAT", type="password", key="PAT")
-  model_url = st.text_input("Enter Clarifai LLM model URL", key="model_url")
-  if model_url:
-    llm = ClarifaiLLM(model_url=model_url, pat=PAT)
-    if "config" not in st.session_state.keys():
-      st.session_state["config"] = True
+def init_search_db(no_of_examples):
+  query_params = st.experimental_get_query_params()
+  USER_ID = query_params["user_id"][0] if "user_id" in query_params.keys() else None
+  APP_ID = query_params["app_id"][0] if "app_id" in query_params.keys() else None
+  search_vectorDB = Search(
+    user_id=USER_ID,
+    app_id=APP_ID,
+    top_k=no_of_examples,
+    pat = PAT
+  )
+  return search_vectorDB
+  
+def retrieve_and_parse_rag(user_query, vectorDB, pat):
+  examples = retrieve_examples_rag(vectorDB, user_query, pat)
+  return rag_prompt_template(examples,user_query), examples
 
-
-def chatbot():
-  """chatbot """
-  if message := st.chat_input(key="input"):
-    st.chat_message("user").write(message)
-    st.session_state['chat_history'].append({"role": "user", "content": message})
-    with st.chat_message("assistant"):
-      with st.spinner("Thinking..."):
-        PT = prompt_template(st.session_state['few_shot_examples'], message)
-        response = llm(PT)
-        st.write(response)
-        message = {"role": "assistant", "content": response}
-        st.session_state['chat_history'].append(message)
-        
 def selectbox():
     with st.sidebar:
-        counter1 = option_menu("previous queries", [st.session_state['chat_history'][-1],st.session_state['chat_history'][-2]],icons=['chat', 'chat'], menu_icon="cast", default_index=0)
-        if counter1:
-            st.write(str(counter1))
-            
-def textbox():
+        counter1 = option_menu("previous queries", 
+                               [st.session_state['chat_history'][-1],st.session_state['chat_history'][-2]],
+                               icons=['chat', 'chat'], menu_icon="cast", default_index=0)
+
+def model_Select():
+  llm_params = llm_models()
+  selected_model = st.selectbox("Select the LLM model", list(llm_params.keys()), index=38)
+  if selected_model:
+    llm = ClarifaiLLM(model_url=llm_params[selected_model], pat=PAT)
+
+  return llm
+ 
+def process_response(text):
+    # Find & remove any text after line containing "Remarks"
+    remarks_index = text.find("Remarks")
+    if remarks_index != -1:
+        newline_index = text.find('\n', remarks_index)
+        if newline_index != -1:
+            text = text[:newline_index]
+    # Format newlines for html rendering
+    text = text.replace('\n','<br>')
+    return text
+
+def textbox(llm, mode, zero_shot_examples, no_of_examples : int = 1):
    user_query = st.text_area("Enter your text here", key="text_area")
-   if user_query:
+   classify_button = st.button("Classify", key="classify_btn") 
+   if classify_button: 
     with st.spinner("Thinking..."):
-          PT = prompt_template(st.session_state['few_shot_examples'], user_query)
-          response = llm(PT)
-          st.write(response)
-          message = [{"Query": user_query, "Response": response}]
-          st.session_state['chat_history'].append(message)
-          if len(st.session_state['chat_history']) >= 2:
-            selectbox()
+      rag_examples = None
+      if mode == "RAG":
+        vectorDB = init_search_db(no_of_examples)
+        prompt, rag_examples = retrieve_and_parse_rag(user_query, vectorDB, PAT)
+      else:
+        prompt = prompt_template(zero_shot_examples, user_query)
         
+      response = llm.invoke(prompt)
+      print(response.replace('\n','\\n'))
+      st.markdown(process_response(response), unsafe_allow_html=True)
+
+      if rag_examples:
+        table = PrettyTable()
+        table.field_names = ["Retrieved Context", "Similarity Score"]
+        
+        for context, score in rag_examples:
+          table.add_row([context, score])
+          
+        st.markdown("#") 
+        st.write("**Closest matching items:**")
+        st.write(table)
+
+      message = [{"Query": user_query, "Response": response}]
+      st.session_state['chat_history'].append(message)
+      if len(st.session_state['chat_history']) >= 2:
+        selectbox()
+ 
+lm = model_Select()       
 if not st.session_state['start_chat']:
     chatbtn = st.button("Start Chatting", key="chat_btn")
     if chatbtn:
        st.session_state['start_chat'] = True
        st.experimental_rerun()
+       
+with st.sidebar:
+  mode = st.radio("**Select the classification mode**",["ICL","RAG"] )
+  
+  if mode == "RAG":
+    no_of_examples = st.number_input("Enter the number of examples",min_value=1,max_value=25)
+  
+  if mode:
+    zst = zero_shot_contents()
+    if "config" not in st.session_state.keys():
+      st.session_state["config"] = True
+
 try:
-  if st.session_state['start_chat'] and st.session_state["config"] and st.session_state['few_shot_examples']:
-    textbox()
+  if st.session_state['start_chat'] and st.session_state["config"]:
+    if mode == "RAG":
+      textbox(lm, mode, zst, no_of_examples)
+    else:
+      textbox(lm, mode, zst)
+      
     st.markdown(
         "<br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>",
         unsafe_allow_html=True,
     )
 except Exception as e:
-  st.error(f"""Classification failed due to {e},\n\n1. Make sure you have uploaded the data\n2. Make sure you have entered the Clarifai PAT\n3. Make sure you have entered the Clarifai LLM model URL""")
+  st.error(f"""Classification failed due to {e}.""")
