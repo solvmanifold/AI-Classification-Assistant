@@ -56,8 +56,8 @@ def selectbox():
                                icons=['chat', 'chat'], menu_icon="cast", default_index=0)
 
 def model_Select():
-  llm_model,llm_params = llm_models()
-  selected_model = st.selectbox("Select the LLM model", llm_model)
+  llm_params = llm_models()
+  selected_model = st.selectbox("Select the LLM model", list(llm_params.keys()), index=38)
   if selected_model:
     llm = ClarifaiLLM(model_url=llm_params[selected_model], pat=PAT)
 
