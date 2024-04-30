@@ -27,7 +27,7 @@ def prompt_template(classify_examples, user_query):
     You must limit your response to only the single row that most closely relates to the input text, do not respond with multiple rows.
 
   Example 1:
-  input text : The MIP's overall funding approved by congress for FY23 is $4.3B.
+  input text : The MIP's overall funding approved by congress for FY13 is $4.3B.
   Assistant:
   Item: (U) The aggregate or "top line" amount of funds requested and approved by Congress for the DoD Military Intelligence Program (MIP) for fiscal years 2007 through 2014.
   Level: 
