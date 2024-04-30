@@ -2,6 +2,8 @@ import os
 import requests
 from concurrent.futures import ThreadPoolExecutor
 
+from clarifai.client.app import App
+
 def prompt_template(classify_examples, user_query):
     prompt = f"""Human: Your job is to use information from the following classification guide to classify the input text.
 
@@ -121,73 +123,19 @@ def rag_prompt_template(rag_examples,user_query):
   """
   return prompt
 
-def llm_models():
+def list_all_models(pat):
+  llm_community_models = App(pat=pat).list_models(filter_by={"query": "LLM"},
+                                           only_in_app=False)
+  model_list={}
+  for model in llm_community_models:
+    user_id = model.user_id
+    app_id = model.app_id
+    model_id = model.id
+    model_list[f"{user_id}:{(model_id.replace('_','.'))}"]=f"https://clarifai.com/{user_id}/{app_id}/models/{model_id}"
+    sorted_dict = {k: model_list[k] for k in sorted(model_list)}
     
-    model_params = {'ai21:Jurassic2-Grande': 'https://clarifai.com/ai21/complete/models/Jurassic2-Grande',
-                    'ai21:Jurassic2-Grande-Instruct': 'https://clarifai.com/ai21/complete/models/Jurassic2-Grande-Instruct', 
-                    'ai21:Jurassic2-Jumbo': 'https://clarifai.com/ai21/complete/models/Jurassic2-Jumbo', 
-                    'ai21:Jurassic2-Jumbo-Instruct': 'https://clarifai.com/ai21/complete/models/Jurassic2-Jumbo-Instruct', 
-                    'ai21:Jurassic2-Large': 'https://clarifai.com/ai21/complete/models/Jurassic2-Large',
-                    "anthropic:claude-3-opus":"https://clarifai.com/anthropic/completion/models/claude-3-opus", 
-                    'anthropic:claude-2.1': 'https://clarifai.com/anthropic/completion/models/claude-2_1', 
-                    'anthropic:claude-instant': 'https://clarifai.com/anthropic/completion/models/claude-instant', 
-                    'anthropic:claude-instant-1.2': 'https://clarifai.com/anthropic/completion/models/claude-instant-1_2',
-                    'anthropic:claude-v1': 'https://clarifai.com/anthropic/completion/models/claude-v1', 
-                    'anthropic:claude-v2': 'https://clarifai.com/anthropic/completion/models/claude-v2',
-                    'bigcode:StarCoder': 'https://clarifai.com/bigcode/code/models/StarCoder', 
-                    'cohere:cohere-generate-command': 'https://clarifai.com/cohere/generate/models/cohere-generate-command', 
-                    'cohere:command-r-plus': 'https://clarifai.com/cohere/generate/models/command-r-plus', 
-                    'databricks:dbrx-instruct': 'https://clarifai.com/databricks/drbx/models/dbrx-instruct',
-                    'databricks:dolly-v2-12b': 'https://clarifai.com/databricks/Dolly-v2/models/dolly-v2-12b',
-                    'deci:deciLM-7B-instruct': 'https://clarifai.com/deci/decilm/models/deciLM-7B-instruct', 
-                    'fblgit:una-cybertron-7b-v2': 'https://clarifai.com/fblgit/una-cybertron/models/una-cybertron-7b-v2',
-                    'gcp:code-bison': 'https://clarifai.com/gcp/generate/models/code-bison', 
-                    'gcp:code-gecko': 'https://clarifai.com/gcp/generate/models/code-gecko',
-                    'gcp:gemini-pro': 'https://clarifai.com/gcp/generate/models/gemini-pro',
-                    'gcp:gemma-1.1-7b-it': 'https://clarifai.com/gcp/generate/models/gemma-1_1-7b-it',
-                    'gcp:gemma-2b-it': 'https://clarifai.com/gcp/generate/models/gemma-2b-it',
-                    'gcp:gemma-7b-it': 'https://clarifai.com/gcp/generate/models/gemma-7b-it', 
-                    'gcp:text-bison': 'https://clarifai.com/gcp/generate/models/text-bison', 
-                    'huggingface-research:zephyr-7B-alpha': 'https://clarifai.com/huggingface-research/zephyr/models/zephyr-7B-alpha', 
-                    'meta:Llama-3-8B-Instruct': 'https://clarifai.com/meta/Llama-3/models/Llama-3-8B-Instruct', 
-                    'meta:codeLlama-70b-Instruct': 'https://clarifai.com/meta/Llama-2/models/codeLlama-70b-Instruct',
-                    'meta:codeLlama-70b-Python': 'https://clarifai.com/meta/Llama-2/models/codeLlama-70b-Python',
-                    'meta:llama2-13b-chat': 'https://clarifai.com/meta/Llama-2/models/llama2-13b-chat', 
-                    'meta:llama2-70b-chat': 'https://clarifai.com/meta/Llama-2/models/llama2-70b-chat', 
-                    'meta:llama2-7b-chat': 'https://clarifai.com/meta/Llama-2/models/llama2-7b-chat', 
-                    'meta:llama2-7b-chat-vllm': 'https://clarifai.com/meta/Llama-2/models/llama2-7b-chat-vllm',
-                    'meta:llamaGuard-7b': 'https://clarifai.com/meta/Llama-2/models/llamaGuard-7b',
-                    'microsoft:phi-1.5': 'https://clarifai.com/microsoft/text-generation/models/phi-1_5',
-                    'microsoft:phi-2': 'https://clarifai.com/microsoft/text-generation/models/phi-2', 
-                    'mistralai:mistral-7B-Instruct': 'https://clarifai.com/mistralai/completion/models/mistral-7B-Instruct',
-                    'mistralai:mistral-7B-OpenOrca': 'https://clarifai.com/mistralai/completion/models/mistral-7B-OpenOrca',
-                    'mistralai:mistral-large': 'https://clarifai.com/mistralai/completion/models/mistral-large', 
-                    'mistralai:mistral-medium': 'https://clarifai.com/mistralai/completion/models/mistral-medium', 
-                    'mistralai:mistral-small': 'https://clarifai.com/mistralai/completion/models/mistral-small',
-                    'mistralai:mixtral-8x22B': 'https://clarifai.com/mistralai/completion/models/mixtral-8x22B', 
-                    'mistralai:mixtral-8x7B-Instruct-v0.1': 'https://clarifai.com/mistralai/completion/models/mixtral-8x7B-Instruct-v0_1', 
-                    'mistralai:openHermes-2-mistral-7B': 'https://clarifai.com/mistralai/completion/models/openHermes-2-mistral-7B', 
-                    'mosaicml:mpt-7b-instruct': 'https://clarifai.com/mosaicml/mpt/models/mpt-7b-instruct',
-                    'nousresearch:genstruct-7b': 'https://clarifai.com/nousresearch/instruction-generation/models/genstruct-7b',
-                    'openai:GPT-3.5-turbo': 'https://clarifai.com/openai/chat-completion/models/GPT-3_5-turbo', 
-                    'openai:GPT-4': 'https://clarifai.com/openai/chat-completion/models/GPT-4', 
-                    'openai:gpt-3.5-turbo-instruct': 'https://clarifai.com/openai/completion/models/gpt-3_5-turbo-instruct', 
-                    'openai:gpt-4-turbo': 'https://clarifai.com/openai/chat-completion/models/gpt-4-turbo', 
-                    'openchat:openchat-3.5-1210': 'https://clarifai.com/openchat/openchat/models/openchat-3_5-1210', 
-                    'salesforce:xgen-7b-8k-instruct': 'https://clarifai.com/salesforce/xgen/models/xgen-7b-8k-instruct', 
-                    'tiiuae:falcon-40b-instruct': 'https://clarifai.com/tiiuae/falcon/models/falcon-40b-instruct', 
-                    'togethercomputer:RedPajama-INCITE-7B-Chat': 'https://clarifai.com/togethercomputer/RedPajama/models/RedPajama-INCITE-7B-Chat', 
-                    'togethercomputer:stripedHyena-Nous-7B': 'https://clarifai.com/togethercomputer/stripedHyena/models/stripedHyena-Nous-7B', 
-                    'upstage:solar-10.7b-instruct': 'https://clarifai.com/upstage/solar/models/solar-10_7b-instruct', 
-                    'wizardlm:wizardCoder-15B': 'https://clarifai.com/wizardlm/generate/models/wizardCoder-15B', 
-                    'wizardlm:wizardCoder-Python-34B': 'https://clarifai.com/wizardlm/generate/models/wizardCoder-Python-34B', 
-                    'wizardlm:wizardLM-13B': 'https://clarifai.com/wizardlm/generate/models/wizardLM-13B', 
-                    'wizardlm:wizardLM-70B': 'https://clarifai.com/wizardlm/generate/models/wizardLM-70B'}
-    
-    return model_params
-
-    
-                        
+  return sorted_dict     
+          
 def zero_shot_contents():
     return """ 
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">

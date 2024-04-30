@@ -55,9 +55,9 @@ def selectbox():
                                [st.session_state['chat_history'][-1],st.session_state['chat_history'][-2]],
                                icons=['chat', 'chat'], menu_icon="cast", default_index=0)
 
-def model_Select():
-  llm_params = llm_models()
-  selected_model = st.selectbox("Select the LLM model", list(llm_params.keys()), index=38)
+def model_Select(pat):
+  llm_params = list_all_models(pat)
+  selected_model = st.selectbox("Select the LLM you want to use:", list(llm_params.keys()), index=10)
   if selected_model:
     llm = ClarifaiLLM(model_url=llm_params[selected_model], pat=PAT)
 
@@ -106,7 +106,7 @@ def textbox(llm, mode, zero_shot_examples, no_of_examples : int = 1):
       if len(st.session_state['chat_history']) >= 2:
         selectbox()
  
-lm = model_Select()       
+lm = model_Select(PAT)       
 if not st.session_state['start_chat']:
     chatbtn = st.button("Start Chatting", key="chat_btn")
     if chatbtn:
